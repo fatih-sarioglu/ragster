@@ -2,3 +2,4 @@
 .env
 /docs
 /venv
+/gradio_cached_examples
