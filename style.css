@@ -1,1 +1,25 @@
-div[id="title"] h1 {text-align: center;}
+.prose.svelte-gq7qsu h1 {
+    text-align: center;
+    font-size: 35px
+}
+
+.gradio-container.gradio-container-4-42-0.svelte-wpkpf6.app {
+    padding-top: 30px;
+    padding-left: 50px;
+    padding-right: 50px;
+    padding-bottom: 10px;
+    max-width: 80%;
+    min-width: 850px;
+}
+
+.sidebar {
+    padding: 15px;
+}
+
+.upload_file_button.svelte-cmf5ev {
+    margin-top: 10px;
+}
+
+.new_chat_button.svelte-cmf5ev {
+    margin-top: 25px;
+}
