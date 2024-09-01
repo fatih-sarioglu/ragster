@@ -5,7 +5,6 @@ from fastapi.responses import StreamingResponse
 
 from langchain_core.output_parsers import StrOutputParser, SimpleJsonOutputParser
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_pinecone import PineconeVectorStore
@@ -40,7 +39,7 @@ async def create_vector_store(docs: DocumentListModel) -> None:
     global chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     
-    chunks = await asyncio.to_thread(text_splitter.split_documents, docs)
+    chunks = await asyncio.to_thread(text_splitter.split_documents, docs.documents)
 
     vector_store = await asyncio.to_thread(
         PineconeVectorStore.from_documents,
@@ -110,16 +109,16 @@ async def chat(
     query: Query = Body(...),
 ):
     docs = await retrieve_docs(query.text, 3)
-    #await docs
+    
     return StreamingResponse(generate_chat_responses(message=query.text, docs=docs), media_type="text/event-stream")
 
 @app.post("/upload_document")
 async def upload_document(
     documents: DocumentListModel = Body(...),
 ):
+    
     await create_vector_store(documents)
     recommended_questions = await generate_recommended_questions()
-    #await recommended_questions
 
     return recommended_questions
 
