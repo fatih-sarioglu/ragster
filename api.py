@@ -100,7 +100,9 @@ async def generate_recommended_questions():
         'uploaded_document_first_pages': get_first_pages(chunks)
     })
 
-    
+async def generate_error_response():
+    for word in ["Seems like you sent an empty message. Please type something to get a response."]:
+        yield f"{word}"
 
 app = FastAPI()
 
@@ -108,6 +110,9 @@ app = FastAPI()
 async def chat(
     query: Query = Body(...),
 ):
+    if query.text == "":
+        return StreamingResponse(generate_error_response(), media_type="text/event-stream")
+
     docs = await retrieve_docs(query.text, 3)
     
     return StreamingResponse(generate_chat_responses(message=query.text, docs=docs), media_type="text/event-stream")
