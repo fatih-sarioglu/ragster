@@ -10,7 +10,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_pinecone import PineconeVectorStore
 from langchain_anthropic import ChatAnthropic
 
-from models import Query, DocumentListModel
+from models import Query, ModelSelection, DocumentListModel
 
 from prompt_templates import template_1, template_2
 
@@ -32,6 +32,18 @@ embeddings = OpenAIEmbeddings(
 
 vector_store = PineconeVectorStore(embedding=embeddings, index_name='ragster')
 chunks = None
+
+gpt_model = ChatOpenAI(
+    model='gpt-4o-mini',
+    temperature=0.4,
+    streaming=True,
+)
+
+claude_model = ChatAnthropic(
+    model='claude-3-5-sonnet-20240620',
+    temperature=0.4,
+    streaming=True,
+)
 
 
 async def create_vector_store(docs: DocumentListModel) -> None:
@@ -63,31 +75,15 @@ def get_first_pages(chunks: list) -> str:
     return first_pages
 ################################################################
 
-choose = 0
-llm = None
-
-if choose == 0:
-    llm = ChatOpenAI(
-        model='gpt-4o-mini',
-        temperature=0.4,
-        streaming=True,
-    )
-else:
-    llm = ChatAnthropic(
-        model='claude-3-5-sonnet-20240620',
-        temperature=0.5,
-        streaming=True,
-    )
-
 
 chat_prompt = PromptTemplate.from_template(template_1)
-chain = chat_prompt | llm | StrOutputParser()
-
 chat_prompt_2 = PromptTemplate.from_template(template_2)
-chain_2 = chat_prompt_2 | llm | SimpleJsonOutputParser()
 
 
-async def generate_chat_responses(message: str, docs: str):
+async def generate_chat_responses(message: str, model: int, docs: str):
+    llm = gpt_model if model == 1 else claude_model
+    chain = chat_prompt | llm | StrOutputParser()
+
     async for chunk in chain.astream({
         "user_question": message,
         "docs": docs
@@ -95,7 +91,10 @@ async def generate_chat_responses(message: str, docs: str):
         yield f"{chunk}"
 
 
-async def generate_recommended_questions():
+async def generate_recommended_questions(model: int):
+    llm = gpt_model if model == 1 else claude_model
+    chain_2 = chat_prompt_2 | llm | SimpleJsonOutputParser()
+    
     return await chain_2.ainvoke({
         'uploaded_document_first_pages': get_first_pages(chunks)
     })
@@ -108,22 +107,24 @@ app = FastAPI()
 
 @app.get("/chat")
 async def chat(
-    query: Query = Body(...),
+    query: Query,
+    model_selection: ModelSelection,
 ):
     if query.text == "":
         return StreamingResponse(generate_error_response(), media_type="text/event-stream")
 
     docs = await retrieve_docs(query.text, 3)
     
-    return StreamingResponse(generate_chat_responses(message=query.text, docs=docs), media_type="text/event-stream")
+    return StreamingResponse(generate_chat_responses(message=query.text, model=model_selection.model, docs=docs), media_type="text/event-stream")
 
 @app.post("/upload_document")
 async def upload_document(
-    documents: DocumentListModel = Body(...),
+    documents: DocumentListModel,
+    model_selection: ModelSelection,
 ):
     
     await create_vector_store(documents)
-    recommended_questions = await generate_recommended_questions()
+    recommended_questions = await generate_recommended_questions(model=model_selection.model)
 
     return recommended_questions
 

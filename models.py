@@ -13,3 +13,6 @@ class DocumentModel(BaseModel):
 # define a pydantic model for a list of documents
 class DocumentListModel(BaseModel):
     documents: List[DocumentModel]
+
+class ModelSelection(BaseModel):
+    model: int

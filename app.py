@@ -4,50 +4,88 @@ from langchain_community.document_loaders import PyPDFLoader
 
 import requests
 
+desired_model = None
+
 # import custom css
 with open("style.css", "r", encoding='utf-8') as f:
     css = f.read()
 
-theme = gr.themes.Default().set(
-    button_cancel_background_fill="#0b750b",
-    button_cancel_background_fill_dark=f"#0b750b",
-    button_cancel_background_fill_hover=f"#0c8a0c",
-    button_cancel_background_fill_hover_dark=f"#0c8a0c",
-    button_cancel_border_color="#0b750b",
-    button_cancel_border_color_dark="#0b750b",
-)
+# upload_file callback function
+def upload_file_fn(file: str) -> dict:
+    # load the content of the uploaded PDF file
+    loader = PyPDFLoader(file)
+    docs = loader.load()
+    docs_serialized = [{"page_content": doc.page_content, "metadata": doc.metadata} for doc in docs]
+
+    print(f"Model: {desired_model}")
+    
+    # send the content of the uploaded file to the backend to store it and get example questions
+    res = requests.post(
+        "http://localhost:8000/upload_document",
+        json={
+            "documents": {"documents": docs_serialized[:5]},
+            "model_selection": {"model": desired_model},
+        },
+    )
+
+    example_questions = res.json()
+
+    # update the UI
+    return {
+        upload_file: gr.UploadButton(interactive=False),
+        chat_input: gr.Textbox(interactive=True),
+        send_button: gr.Button(interactive=True),
+        chatbot: gr.Chatbot(height=440, placeholder="<h2>ASK YOUR QUESTIONS</h2>"),
+        examples_title: gr.Markdown(visible=True),
+        example_1: gr.Button(example_questions['q1'], visible=True),
+        example_3: gr.Button(example_questions['q2'], visible=True),
+        example_2: gr.Button(example_questions['q3'], visible=True),
+    }
 
 
+def select_model(model: str):
+    global desired_model
+    desired_model = 1 if model == "GPT-4o-mini" else 2
+    print(f"Selected model: {model}")
+    return {
+        select_model_dropdown: gr.Dropdown(interactive=False),
+        upload_file: gr.UploadButton(interactive=True),
+    }
+
+
+# 3 consecutive functions to handle sending and receiving messages
 def put_message(history, message: str):
     history = [] if history is None else history
 
-    if message != '':
-        history.append((message, None))
-    
+    print(f"Message: {message}")
+    print(f"History: {history}")
+
+    history.append((message, None))
+
     return {
         chatbot: history,
-        chat_input: gr.Textbox(value=None, interactive=True),
-        send_button: gr.Button(interactive=True),
+        chat_input: gr.Textbox(value=None, interactive=False),
+        send_button: gr.Button(interactive=False),
     }
 
 def get_and_put_response(history):
-    
-    if len(history) != 0 and history[-1][1] is None:
-        history[-1][1] = ""
 
-        s = requests.Session()
-        with s.get(
-            "http://localhost:8000/chat",
-            stream=True,
-            json={"text": history[-1][0]}
-        ) as r:
-            for line in r.iter_content(decode_unicode=True):
-                history[-1][1] += line
-                yield history
+    print(f"History 2: {history}")
     
-    return {
-        chatbot: history,
-    }
+    history[-1][1] = ""
+
+    s = requests.Session()
+    with s.get(
+        "http://localhost:8000/chat",
+        stream=True,
+        json={
+            "query": {"text": history[-1][0]},
+            "model_selection": {"model": desired_model},
+        }
+    ) as r:
+        for line in r.iter_content(decode_unicode=True):
+            history[-1][1] += line
+            yield history
 
 def after_response():
     return {
@@ -56,7 +94,7 @@ def after_response():
     }
 
 
-
+# new_chat_button callback function
 def new_chat():
     return {
         chatbot: [],
@@ -70,8 +108,9 @@ def new_chat():
     }
 
 
-with gr.Blocks(fill_height=False, fill_width=False, css=css, theme=theme, title='RAGSTER') as demo:
+with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as demo:
     with gr.Row():
+        # sidebar
         with gr.Column(scale=0,variant='panel', min_width=250, elem_classes='sidebar') as sidebar_left:
             gr.Image(
                 './img/document.png',
@@ -89,41 +128,56 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, theme=theme, title=
 
                 # RAGSTER
                 
-                ### RAGSTER is a chatbot that can answer your questions based on the content of a PDF file you upload.
+                ### RAGSTER is a chatbot that can answer your questions based on a PDF file you upload.
                 
                 
 
-                ### Upload a PDF file and ask your questions.
+                ### Select a model, then upload a PDF file and ask your questions.
                 """,
                 elem_classes='title',
             )
+
             
+            select_model_dropdown = gr.Dropdown(
+                choices=["GPT-4o-mini", "Claude 3.5 Sonnet"],
+                label="Select AI Model",
+                interactive=True
+            )
 
             upload_file = gr.UploadButton(
                 label="Upload a PDF file",
                 variant='primary',
-                interactive=True,
+                interactive=False,
                 elem_classes='upload_file_button',
                 file_types=['.pdf'],
+            )
+
+
+            select_model_dropdown.select(
+                fn=select_model,
+                inputs=[select_model_dropdown],
+                outputs=[select_model_dropdown, upload_file],
             )
 
             new_chat_button = gr.Button(
                 value="New Chat",
                 elem_classes='new_chat_button',
-                variant='secondary'
+                variant='secondary',
+                size='sm'
             )
 
-
+        # main chat interface
         with gr.Column(scale=10,) as main:
+            # chat messages will appear here
             chatbot = gr.Chatbot(
                 show_label=False,
-                placeholder="<h2><strong>UPLOAD A FILE</strong></h2><br><h3>THEN ASK YOUR QUESTIONS</h3></br>",
+                placeholder="<h2><strong>SELECT AN AI MODEL AND UPLOAD A FILE</strong></h2><br><h3>THEN ASK YOUR QUESTIONS</h3></br>",
                 height=530,
                 elem_classes='chatbot',
                 bubble_full_width=False
             )
             
-
+            # textbox and send button
             with gr.Row():
                 chat_input = gr.Textbox(
                     placeholder="Your message",
@@ -146,8 +200,19 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, theme=theme, title=
             
             # sending and receiving messages
             # same functionality for send button and enter key
-            send_button.click(put_message, [chatbot, chat_input], [chatbot, chat_input, send_button]).then(get_and_put_response, [chatbot], [chatbot]).then(after_response, None, [chat_input, send_button])
-            chat_msg = chat_input.submit(put_message, [chatbot, chat_input], [chatbot, chat_input, send_button]).then(get_and_put_response, [chatbot], [chatbot]).then(after_response, None, [chat_input, send_button])
+            gr.on(
+                triggers=[send_button.click, chat_input.submit],
+                fn=put_message,
+                inputs=[chatbot, chat_input],
+                outputs=[chatbot, chat_input, send_button],
+            ).success(
+                get_and_put_response,
+                inputs=[chatbot],
+                outputs=[chatbot],
+            ).success(
+                after_response,
+                outputs=[chat_input, send_button],
+            )
 
             # example questions that user can ask based on the content of the uploaded PDF file
             examples_title = gr.Markdown(
@@ -161,44 +226,6 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, theme=theme, title=
                 example_3 = gr.Button("", size='sm', variant='secondary', visible=False)
 
             
-
-            def upload_file_fn(file: str) -> dict:
-                """
-                Function to handle the file upload event.It loads the content of the uploaded PDF file and sends it to the backend for processing.
-                Gets the response from the backend and displays example questions that the user can ask based on the content of the uploaded PDF file.
-                Disables the upload button and enables the main chat interface.
-
-                Args: 
-                    file (str): The path to the uploaded file.
-                """
-
-                print(f"File uploaded:\n{file}")
-
-                # load the content of the uploaded PDF file
-                # loader = PyPDFLoader(file)
-                # docs = loader.load()
-                # docs_serialized = [{"page_content": doc.page_content, "metadata": doc.metadata} for doc in docs]
-                
-                # # send the content of the uploaded file to the backend to store it and get example questions
-                # res = requests.post(
-                #     "http://localhost:8000/upload_document",
-                #     json={"documents": docs_serialized[:5]},
-                # )
-
-                # example_questions = res.json()
-
-                # update the UI
-                return {
-                    upload_file: gr.UploadButton(interactive=False),
-                    chat_input: gr.Textbox(interactive=True),
-                    send_button: gr.Button(interactive=True),
-                    chatbot: gr.Chatbot(height=440, placeholder="<h2>ASK YOUR QUESTIONS</h2>"),
-                    examples_title: gr.Markdown(visible=True),
-                    # example_1: gr.Button(example_questions['q1'], visible=True),
-                    # example_3: gr.Button(example_questions['q2'], visible=True),
-                    # example_2: gr.Button(example_questions['q3'], visible=True),
-                }
-
             # upload file event
             upload_file.upload(
                 fn=upload_file_fn,
@@ -206,6 +233,7 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, theme=theme, title=
                 outputs=[upload_file, chat_input, send_button, chatbot, examples_title, example_1, example_2, example_3],
             )
 
+            # new chat event
             new_chat_button.click(
                 new_chat,
                 None,
