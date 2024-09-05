@@ -23,7 +23,7 @@ def upload_file_fn(file: str) -> dict:
     res = requests.post(
         "http://localhost:8000/upload_document",
         json={
-            "documents": {"documents": docs_serialized[:5]},
+            "documents": {"documents": docs_serialized},
             "model_selection": {"model": desired_model},
         },
     )
@@ -37,9 +37,9 @@ def upload_file_fn(file: str) -> dict:
         send_button: gr.Button(interactive=True),
         chatbot: gr.Chatbot(height=440, placeholder="<h2>ASK YOUR QUESTIONS</h2>"),
         examples_title: gr.Markdown(visible=True),
-        example_1: gr.Button(example_questions['q1'], visible=True),
-        example_3: gr.Button(example_questions['q2'], visible=True),
-        example_2: gr.Button(example_questions['q3'], visible=True),
+        example_1: gr.Button(value=example_questions['q1'], visible=True),
+        example_3: gr.Button(value=example_questions['q2'], visible=True),
+        example_2: gr.Button(value=example_questions['q3'], visible=True),
     }
 
 
@@ -51,6 +51,8 @@ def select_model(model: str):
         select_model_dropdown: gr.Dropdown(interactive=False),
         upload_file: gr.UploadButton(interactive=True),
     }
+
+
 
 
 # 3 consecutive functions to handle sending and receiving messages
@@ -101,6 +103,7 @@ def new_chat():
         chat_input: gr.Textbox(interactive=False, value=None),
         send_button: gr.Button(interactive=False),
         upload_file: gr.UploadButton(interactive=True),
+        select_model_dropdown: gr.Dropdown(interactive=True, value=None),
         examples_title: gr.Markdown(visible=False),
         example_1: gr.Button('', visible=False),
         example_3: gr.Button('', visible=False),
@@ -225,6 +228,45 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as
                 example_2 = gr.Button("", size='sm', variant='secondary', visible=False)
                 example_3 = gr.Button("", size='sm', variant='secondary', visible=False)
 
+            example_1.click(
+                put_message,
+                inputs=[chatbot, example_1],
+                outputs=[chatbot, chat_input, send_button],
+            ).success(
+                get_and_put_response,
+                inputs=[chatbot],
+                outputs=[chatbot],
+            ).success(
+                after_response,
+                outputs=[chat_input, send_button],
+            )
+
+            example_2.click(
+                put_message,
+                inputs=[chatbot, example_2],
+                outputs=[chatbot, chat_input, send_button],
+            ).success(
+                get_and_put_response,
+                inputs=[chatbot],
+                outputs=[chatbot],
+            ).success(
+                after_response,
+                outputs=[chat_input, send_button],
+            )
+
+            example_3.click(
+                put_message,
+                inputs=[chatbot, example_3],
+                outputs=[chatbot, chat_input, send_button],
+            ).success(
+                get_and_put_response,
+                inputs=[chatbot],
+                outputs=[chatbot],
+            ).success(
+                after_response,
+                outputs=[chat_input, send_button],
+            )
+
             
             # upload file event
             upload_file.upload(
@@ -237,7 +279,7 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as
             new_chat_button.click(
                 new_chat,
                 None,
-                [chatbot, chatbot, chat_input, send_button, upload_file, examples_title, example_1, example_2, example_3]
+                [chatbot, chatbot, chat_input, send_button, upload_file, select_model_dropdown, examples_title, example_1, example_2, example_3]
             ).then(lambda: (
                 {chatbot: gr.Chatbot(height=530, placeholder="<h2><strong>UPLOAD A FILE</strong></h2><br><h3>THEN ASK YOUR QUESTIONS</h3></br>")}
                     ),
