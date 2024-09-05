@@ -9,6 +9,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_pinecone import PineconeVectorStore
 from langchain_anthropic import ChatAnthropic
+from pinecone.core.openapi.shared.exceptions import NotFoundException
 
 from models import Query, ModelSelection, DocumentListModel
 
@@ -127,6 +128,14 @@ async def upload_document(
     recommended_questions = await generate_recommended_questions(model=model_selection.model)
 
     return recommended_questions
+
+@app.delete("/clear_index")
+async def clear_index():
+    try:
+        await asyncio.to_thread(vector_store.delete, namespace='', delete_all=True)
+    except NotFoundException:
+        return {"message": "Namespace does not exist"}
+    return {"message": "Index cleared"}
 
 
 # clear the index at the end of the session

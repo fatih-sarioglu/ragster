@@ -4,6 +4,8 @@ from langchain_community.document_loaders import PyPDFLoader
 
 import requests
 
+requests.delete("http://localhost:8000/clear_index")
+
 desired_model = None
 
 # import custom css
@@ -53,8 +55,6 @@ def select_model(model: str):
     }
 
 
-
-
 # 3 consecutive functions to handle sending and receiving messages
 def put_message(history, message: str):
     history = [] if history is None else history
@@ -98,6 +98,8 @@ def after_response():
 
 # new_chat_button callback function
 def new_chat():
+    requests.delete("http://localhost:8000/clear_index")
+
     return {
         chatbot: [],
         chat_input: gr.Textbox(interactive=False, value=None),
@@ -114,7 +116,7 @@ def new_chat():
 with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as demo:
     with gr.Row():
         # sidebar
-        with gr.Column(scale=0,variant='panel', min_width=250, elem_classes='sidebar') as sidebar_left:
+        with gr.Column(scale=0,variant='panel', min_width=250, elem_classes='sidebar', show_progress=False) as sidebar_left:
             gr.Image(
                 './img/document.png',
                 height=110,
@@ -144,7 +146,7 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as
             select_model_dropdown = gr.Dropdown(
                 choices=["GPT-4o-mini", "Claude 3.5 Sonnet"],
                 label="Select AI Model",
-                interactive=True
+                interactive=True,
             )
 
             upload_file = gr.UploadButton(
@@ -170,7 +172,7 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as
             )
 
         # main chat interface
-        with gr.Column(scale=10,) as main:
+        with gr.Column(scale=10,show_progress=False) as main:
             # chat messages will appear here
             chatbot = gr.Chatbot(
                 show_label=False,
@@ -181,7 +183,7 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as
             )
             
             # textbox and send button
-            with gr.Row():
+            with gr.Row(show_progress=False):
                 chat_input = gr.Textbox(
                     placeholder="Your message",
                     container=False,
@@ -223,7 +225,7 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as
                 elem_classes='examples_title',
                 visible=False,
             )
-            with gr.Row():
+            with gr.Row(show_progress=True):
                 example_1 = gr.Button("", size='sm', variant='secondary', visible=False)
                 example_2 = gr.Button("", size='sm', variant='secondary', visible=False)
                 example_3 = gr.Button("", size='sm', variant='secondary', visible=False)
