@@ -3,9 +3,8 @@ import gradio as gr
 from langchain_community.document_loaders import PyPDFLoader
 
 import requests
-
-import os
 import shutil
+import os
 
 desired_model = None
 
@@ -15,6 +14,7 @@ uploaded_file_path = ''
 with open("style.css", "r", encoding='utf-8') as f:
     css = f.read()
 
+
 # upload_file callback function
 def upload_file_fn(file: str) -> dict:
     # load the content of the uploaded PDF file
@@ -23,8 +23,6 @@ def upload_file_fn(file: str) -> dict:
     loader = PyPDFLoader(file)
     docs = loader.load()
     docs_serialized = [{"page_content": doc.page_content, "metadata": doc.metadata} for doc in docs]
-
-    print(f"Model: {desired_model}")
     
     # send the content of the uploaded file to the backend to store it and get example questions
     res = requests.post(
@@ -49,11 +47,12 @@ def upload_file_fn(file: str) -> dict:
         example_2: gr.Button(value=example_questions['q3'], visible=True),
     }
 
+
 # select_model_dropdown callback function
 def select_model(model: str):
     global desired_model
     desired_model = 1 if model == "GPT-4o-mini" else 2
-    print(f"Selected model: {model}")
+    
     return {
         select_model_dropdown: gr.Dropdown(interactive=False),
         upload_file: gr.UploadButton(interactive=True),
@@ -64,9 +63,6 @@ def select_model(model: str):
 def put_message(history, message: str):
     history = [] if history is None else history
 
-    print(f"Message: {message}")
-    print(f"History: {history}")
-
     history.append((message, None))
 
     return {
@@ -76,9 +72,6 @@ def put_message(history, message: str):
     }
 
 def get_and_put_response(history):
-
-    print(f"History 2: {history}")
-    
     history[-1][1] = ""
 
     chat_history = history[-3:] if len(history) > 3 else history
@@ -131,7 +124,6 @@ def new_chat():
         example_3: gr.Button('', visible=False),
         example_2: gr.Button('', visible=False),
     }
-
 
 
 with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER', delete_cache=[10, 3600]) as demo:
@@ -251,6 +243,7 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER', de
                 example_2 = gr.Button("", size='sm', variant='secondary', visible=False)
                 example_3 = gr.Button("", size='sm', variant='secondary', visible=False)
 
+            # example questions events
             example_1.click(
                 put_message,
                 inputs=[chatbot, example_1],

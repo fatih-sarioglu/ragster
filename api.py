@@ -24,9 +24,7 @@ os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 os.environ["PINECONE_API_KEY"] = os.getenv("PINECONE_API_KEY")
 os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY")
 
-
-# load the document and split it into chunks
-################################################################
+# create the embeddings and vector store
 embeddings = OpenAIEmbeddings(
     model='text-embedding-3-small'
 )
@@ -34,6 +32,7 @@ embeddings = OpenAIEmbeddings(
 vector_store = PineconeVectorStore(embedding=embeddings, index_name='ragster')
 chunks = None
 
+# define the chat models
 gpt_model = ChatOpenAI(
     model='gpt-4o-mini',
     temperature=0.4,
@@ -46,7 +45,7 @@ claude_model = ChatAnthropic(
     streaming=True,
 )
 
-
+# create the vector store
 async def create_vector_store(docs: DocumentListModel) -> None:
     global vector_store
     global chunks
@@ -61,6 +60,7 @@ async def create_vector_store(docs: DocumentListModel) -> None:
         index_name='ragster'
     )
 
+# retrieve similar documents
 async def retrieve_docs(query: str, k:int) -> str:
     similar_docs = await asyncio.to_thread(vector_store.similarity_search, query=query, k=k)
 
@@ -69,18 +69,19 @@ async def retrieve_docs(query: str, k:int) -> str:
     )
     return docs_joined
 
+# get the first pages of the documents
 def get_first_pages(chunks: list) -> str:
     first_pages = '\n\n'.join(
         f'Page {idx + 1}: {page.page_content}' for idx, page in enumerate(chunks[:5])
     )
     return first_pages
-################################################################
 
 
+# create the chat prompts
 chat_prompt = PromptTemplate.from_template(template_1)
 chat_prompt_2 = PromptTemplate.from_template(template_2)
 
-
+# generate chat responses in streaming manner
 async def generate_chat_responses(message: str, chat_history: list, model: int, docs: str):
     llm = gpt_model if model == 1 else claude_model
     chain = chat_prompt | llm | StrOutputParser()
@@ -98,7 +99,7 @@ async def generate_chat_responses(message: str, chat_history: list, model: int, 
         }):
         yield f"{chunk}"
 
-
+# generate recommended questions
 async def generate_recommended_questions(model: int):
     llm = gpt_model if model == 1 else claude_model
     chain_2 = chat_prompt_2 | llm | SimpleJsonOutputParser()
@@ -107,9 +108,11 @@ async def generate_recommended_questions(model: int):
         'uploaded_document_first_pages': get_first_pages(chunks)
     })
 
+# send an error response if the message is empty
 async def send_error_response():
     for word in ["Seems like you sent an empty message. Please type something to get a response."]:
         yield f"{word}"
+
 
 app = FastAPI()
 
@@ -147,8 +150,3 @@ async def clear_index():
     except NotFoundException:
         return {"message": "Namespace does not exist"}
     return {"message": "Index cleared"}
-
-
-# clear the index at the end of the session
-# vector_store.delete(namespace='ragster', delete_all=True)
-# write a delete endpoint to clear the index
