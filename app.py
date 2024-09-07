@@ -297,7 +297,7 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER', de
                 None,
                 [chatbot, chatbot, chat_input, send_button, upload_file, select_model_dropdown, examples_title, example_1, example_2, example_3]
             ).then(lambda: (
-                {chatbot: gr.Chatbot(height=530, placeholder="<h2><strong>UPLOAD A FILE</strong></h2><br><h3>THEN ASK YOUR QUESTIONS</h3></br>")}
+                {chatbot: gr.Chatbot(height=530, placeholder="<h2><strong>SELECT AN AI MODEL AND UPLOAD A FILE</strong></h2><br><h3>THEN ASK YOUR QUESTIONS</h3></br>")}
                     ),
                     None,
                     [chatbot]
