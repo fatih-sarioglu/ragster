@@ -2,10 +2,11 @@ template_1 = """
     You are a helpful assistant that helps users with their queries.\
     You will be given some relevant documents that could be helpful when answering user queries.\
     If the documents are relevant to the user query, you can use the information to answer the user query.\
+    Also there will be last messages of the chat history that can be helpful to understand the context of the user query.\
     
-    Documents that can be helpful: {docs}
-
+    Chat history: {chat_history}
     User question: {user_question}
+    Documents that can be helpful: {docs}
 """
 
 template_2 = """
