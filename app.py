@@ -4,9 +4,12 @@ from langchain_community.document_loaders import PyPDFLoader
 
 import requests
 
-requests.delete("http://localhost:8000/clear_index")
+import os
+import shutil
 
 desired_model = None
+
+uploaded_file_path = ''
 
 # import custom css
 with open("style.css", "r", encoding='utf-8') as f:
@@ -15,6 +18,8 @@ with open("style.css", "r", encoding='utf-8') as f:
 # upload_file callback function
 def upload_file_fn(file: str) -> dict:
     # load the content of the uploaded PDF file
+    global uploaded_file_path
+    uploaded_file_path = file
     loader = PyPDFLoader(file)
     docs = loader.load()
     docs_serialized = [{"page_content": doc.page_content, "metadata": doc.metadata} for doc in docs]
@@ -44,7 +49,7 @@ def upload_file_fn(file: str) -> dict:
         example_2: gr.Button(value=example_questions['q3'], visible=True),
     }
 
-
+# select_model_dropdown callback function
 def select_model(model: str):
     global desired_model
     desired_model = 1 if model == "GPT-4o-mini" else 2
@@ -76,6 +81,8 @@ def get_and_put_response(history):
     
     history[-1][1] = ""
 
+    chat_history = history[-3:] if len(history) > 3 else history
+
     s = requests.Session()
     with s.get(
         "http://localhost:8000/chat",
@@ -83,6 +90,7 @@ def get_and_put_response(history):
         json={
             "query": {"text": history[-1][0]},
             "model_selection": {"model": desired_model},
+            "chat_history": {"history": chat_history},
         }
     ) as r:
         for line in r.iter_content(decode_unicode=True):
@@ -96,9 +104,21 @@ def after_response():
     }
 
 
+# clear resources
+def clear_resources():
+    global uploaded_file_path
+    if uploaded_file_path != '':
+        uploaded_file_dir = uploaded_file_path[:uploaded_file_path.rfind("\\")]
+
+        if os.path.exists(uploaded_file_path):
+            shutil.rmtree(uploaded_file_dir)
+
+    requests.delete("http://localhost:8000/clear_index")
+
+
 # new_chat_button callback function
 def new_chat():
-    requests.delete("http://localhost:8000/clear_index")
+    clear_resources()
 
     return {
         chatbot: [],
@@ -113,7 +133,8 @@ def new_chat():
     }
 
 
-with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as demo:
+
+with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER', delete_cache=[10, 3600]) as demo:
     with gr.Row():
         # sidebar
         with gr.Column(scale=0,variant='panel', min_width=250, elem_classes='sidebar', show_progress=False) as sidebar_left:
@@ -288,6 +309,8 @@ with gr.Blocks(fill_height=False, fill_width=False, css=css, title='RAGSTER') as
                     None,
                     [chatbot]
                 )
+            
+    demo.unload(fn=clear_resources)
 
 
 demo.launch()

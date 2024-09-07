@@ -11,7 +11,7 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_anthropic import ChatAnthropic
 from pinecone.core.openapi.shared.exceptions import NotFoundException
 
-from models import Query, ModelSelection, DocumentListModel
+from models import Query, ChatHistory, ModelSelection, DocumentListModel
 
 from prompt_templates import template_1, template_2
 
@@ -81,13 +81,20 @@ chat_prompt = PromptTemplate.from_template(template_1)
 chat_prompt_2 = PromptTemplate.from_template(template_2)
 
 
-async def generate_chat_responses(message: str, model: int, docs: str):
+async def generate_chat_responses(message: str, chat_history: list, model: int, docs: str):
     llm = gpt_model if model == 1 else claude_model
     chain = chat_prompt | llm | StrOutputParser()
+    
+
+    chat_history_str = "".join([f"User: {q_a[0]}\nAI: {q_a[1]}\n" for q_a in chat_history])
+    for q_a in chat_history:
+        chat_history_str += f"User: {q_a[0]}\nAI: {q_a[1]}\n"
+
 
     async for chunk in chain.astream({
         "user_question": message,
-        "docs": docs
+        "docs": docs,
+        "chat_history": chat_history_str
         }):
         yield f"{chunk}"
 
@@ -100,7 +107,7 @@ async def generate_recommended_questions(model: int):
         'uploaded_document_first_pages': get_first_pages(chunks)
     })
 
-async def generate_error_response():
+async def send_error_response():
     for word in ["Seems like you sent an empty message. Please type something to get a response."]:
         yield f"{word}"
 
@@ -110,13 +117,17 @@ app = FastAPI()
 async def chat(
     query: Query,
     model_selection: ModelSelection,
+    chat_history: ChatHistory,
 ):
     if query.text == "":
-        return StreamingResponse(generate_error_response(), media_type="text/event-stream")
+        return StreamingResponse(send_error_response(), media_type="text/event-stream")
 
     docs = await retrieve_docs(query.text, 3)
     
-    return StreamingResponse(generate_chat_responses(message=query.text, model=model_selection.model, docs=docs), media_type="text/event-stream")
+    return StreamingResponse(generate_chat_responses(
+        message=query.text,
+        chat_history=chat_history.history,
+        model=model_selection.model, docs=docs), media_type="text/event-stream")
 
 @app.post("/upload_document")
 async def upload_document(
