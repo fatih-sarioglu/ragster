@@ -32,6 +32,13 @@ To run the application locally, follow these steps:
    pip install -r requirements.txt
    ```
 
+3. **Create a .env file in the root directory** with the following content:
+   ```bash
+   OPENAI_API_KEY=your-openai-api-key
+   ANTHROPIC_API_KEY=your-anthropic-api-key
+   PINECONE_API_KEY=your-pinecone-api-key
+   ```
+
 3. **Run the Backend Server:**
    ```bash
    uvicorn api:app --reload
